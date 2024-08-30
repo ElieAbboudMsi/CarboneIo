@@ -27,8 +27,6 @@ COPY . .
 # Ensure that the templates directory exists
 RUN mkdir -p /usr/src/app/templates
 
-# Link the carbone library (assuming it's local)
-RUN npm link carbone
 
 # Expose the port the app runs on
 EXPOSE 5000

@@ -15,7 +15,8 @@
     "react-dom": "^18.3.1",
     "react-scripts": "5.0.1",
     "web-vitals": "^2.1.4",
-    "xmldom": "^0.6.0"
+    "xmldom": "^0.6.0",
+    "carbone": "file:./carbone"
   },
   "scripts": {
     "start": "react-scripts start",
