@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Link LibreOffice for accessibility
-RUN ln -s /usr/lib/libreoffice /opt/libreoffice
+RUN ln -s /usr/lib/libreoffice /opt/libreoffice7.2
 
 # Set the working directory in the container
 WORKDIR /usr/src/app

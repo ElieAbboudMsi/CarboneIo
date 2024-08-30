@@ -1,14 +1,13 @@
-var extracter = require('./extracter');
-var parser = require('./parser');
-var helper = require('./helper');
-const { DOMParser, XMLSerializer } = require('xmldom');
+var extracter = require("./extracter");
+var parser = require("./parser");
+var helper = require("./helper");
+const { DOMParser, XMLSerializer } = require("xmldom");
 
 function getImageTag(value) {
   return `<img src="data:image/png;base64,${value}" alt="Image" />`;
 }
 
 var builder = {
-
   /**
    * Build the xml according to the data
    * @param  {String}       xml        xml to parse
@@ -24,90 +23,143 @@ var builder = {
    * @param  {Function}     callback
    */
   buildXML: function (xml, data, options, callback) {
-    if (typeof (options) === 'function') {
+    if (typeof options === "function") {
       callback = options;
       options = {};
     }
 
-    parser.findVariables(xml, options.existingVariables, function (err, xmlWithoutVariable, variables) {
-      parser.findMarkers(xmlWithoutVariable, function (err, xmlWithoutMarkers, markers) {
-        if (markers.length === 0) {
-          return callback(null, xmlWithoutVariable);
-        }
-        parser.preprocessMarkers(markers, variables, function (err, preprocessedMarkers) {
-          var _xmlParts = [];
-          var _xmlResult = '';
-          var _builder;
-          if (options.isDebugActive === true) {
-            options.debugInfo.markers = [...options.debugInfo.markers, ...preprocessedMarkers.map((marker) => '{' + marker.name.replace(/^_root\./, '') + '}')];
-          }
-          try {
-            var _dynamicDescriptor = extracter.splitMarkers(preprocessedMarkers);
-            var _descriptor = extracter.splitXml(xmlWithoutMarkers, _dynamicDescriptor);
-            _descriptor = extracter.buildSortedHierarchy(_descriptor);
-            _descriptor = extracter.deleteAndMoveNestedParts(_descriptor);
-            var _builder = builder.getBuilderFunction(_descriptor, options.formatters);
-            var _obj = {
-              d: data,
-              c: options.complement
-            };
-            options.stopPropagation = false;
-            _xmlParts = _builder(_obj, options, helper, _builder.builderDictionary);
-            _xmlResult = builder.assembleXmlParts(_xmlParts, 20, _builder.builderDictionary); // TODO -> adapt the depth of the sort according to the maximum depth in _xmlParts
-            //console.log(_xmlResult);
-
-            // Parse the XML string to a DOM object
-            let parser = new DOMParser();
-            let xmlDoc = parser.parseFromString(_xmlResult, "application/xml");
-
-            // Define namespaces
-            let namespaces = {
-              office: "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
-              draw: "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0",
-              xlink: "http://www.w3.org/1999/xlink"
-            };
-
-            let drawImageElements = xmlDoc.getElementsByTagNameNS(namespaces.draw, "image");
-            for (let i = 0; i < drawImageElements.length; i++) {
-              let drawImageElement = drawImageElements[i];
-              let drawFrameElement = drawImageElement.parentNode;
-              let name = drawFrameElement.getAttribute("draw:name");
-
-              if (name.startsWith("data:")) { // Base64 image
-                // Remove the existing xlink:href attribute
-                drawImageElement.setAttributeNS(namespaces.xlink, "xlink:href", "");
-                if (drawImageElement.hasAttributeNS(namespaces.xlink, "xlink:href")) {
-                  drawImageElement.removeAttributeNS(namespaces.xlink, "xlink:href");
-                }
-
-                // Create the office:binary-data element
-                let binaryDataElement = xmlDoc.createElementNS(namespaces.office, "office:binary-data");
-                binaryDataElement.textContent = name.split(',')[1]; // Extract the base64 data after the comma
-
-                // Append the binary-data element to the draw:image element
-                drawImageElement.appendChild(binaryDataElement);
-              } else if (name.startsWith("http")) { // URL image
-                drawImageElement.setAttributeNS(namespaces.xlink, "xlink:href", name);
-              } else {
-                throw Error("Wrong image format");
-              }
+    parser.findVariables(
+      xml,
+      options.existingVariables,
+      function (err, xmlWithoutVariable, variables) {
+        parser.findMarkers(
+          xmlWithoutVariable,
+          function (err, xmlWithoutMarkers, markers) {
+            if (markers.length === 0) {
+              return callback(null, xmlWithoutVariable);
             }
-            // Serialize the modified XML back to a string
-            let serializer = new XMLSerializer();
-            _xmlResult = serializer.serializeToString(xmlDoc);
+            parser.preprocessMarkers(
+              markers,
+              variables,
+              function (err, preprocessedMarkers) {
+                var _xmlParts = [];
+                var _xmlResult = "";
+                var _builder;
+                if (options.isDebugActive === true) {
+                  options.debugInfo.markers = [
+                    ...options.debugInfo.markers,
+                    ...preprocessedMarkers.map(
+                      (marker) =>
+                        "{" + marker.name.replace(/^_root\./, "") + "}"
+                    ),
+                  ];
+                }
+                try {
+                  var _dynamicDescriptor =
+                    extracter.splitMarkers(preprocessedMarkers);
+                  var _descriptor = extracter.splitXml(
+                    xmlWithoutMarkers,
+                    _dynamicDescriptor
+                  );
+                  _descriptor = extracter.buildSortedHierarchy(_descriptor);
+                  _descriptor = extracter.deleteAndMoveNestedParts(_descriptor);
+                  var _builder = builder.getBuilderFunction(
+                    _descriptor,
+                    options.formatters
+                  );
+                  var _obj = {
+                    d: data,
+                    c: options.complement,
+                  };
+                  options.stopPropagation = false;
+                  _xmlParts = _builder(
+                    _obj,
+                    options,
+                    helper,
+                    _builder.builderDictionary
+                  );
+                  _xmlResult = builder.assembleXmlParts(
+                    _xmlParts,
+                    20,
+                    _builder.builderDictionary
+                  ); // TODO -> adapt the depth of the sort according to the maximum depth in _xmlParts
+                  //console.log(_xmlResult);
 
+                  // Parse the XML string to a DOM object
+                  let parser = new DOMParser();
+                  let xmlDoc = parser.parseFromString(
+                    _xmlResult,
+                    "application/xml"
+                  );
 
-            //console.log("AFTERRRRRRRRRRRRRRRRRRRRRRR------------------" + _xmlResult);
+                  // Define namespaces
+                  let namespaces = {
+                    office: "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
+                    draw: "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0",
+                    xlink: "http://www.w3.org/1999/xlink",
+                  };
 
+                  let drawImageElements = xmlDoc.getElementsByTagNameNS(
+                    namespaces.draw,
+                    "image"
+                  );
+                  for (let i = 0; i < drawImageElements.length; i++) {
+                    let drawImageElement = drawImageElements[i];
+                    let drawFrameElement = drawImageElement.parentNode;
+                    let name = drawFrameElement.getAttribute("draw:name");
+                    if (name.startsWith("data:")) {
+                      // Base64 image
+                      // Remove the existing xlink:href attribute
+                      drawImageElement.setAttributeNS(
+                        namespaces.xlink,
+                        "xlink:href",
+                        ""
+                      );
+                      if (
+                        drawImageElement.hasAttributeNS(
+                          namespaces.xlink,
+                          "xlink:href"
+                        )
+                      ) {
+                        drawImageElement.removeAttributeNS(
+                          namespaces.xlink,
+                          "xlink:href"
+                        );
+                      }
+
+                      // Create the office:binary-data element
+                      let binaryDataElement = xmlDoc.createElementNS(
+                        namespaces.office,
+                        "office:binary-data"
+                      );
+                      binaryDataElement.textContent = name.split(",")[1]; // Extract the base64 data after the comma
+
+                      // Append the binary-data element to the draw:image element
+                      drawImageElement.appendChild(binaryDataElement);
+                    } else if (name.startsWith("http")) {
+                      // URL image
+                      drawImageElement.setAttributeNS(
+                        namespaces.xlink,
+                        "xlink:href",
+                        name
+                      );
+                    }
+                  }
+                  // Serialize the modified XML back to a string
+                  let serializer = new XMLSerializer();
+                  _xmlResult = serializer.serializeToString(xmlDoc);
+
+                  //console.log("AFTERRRRRRRRRRRRRRRRRRRRRRR------------------" + _xmlResult);
+                } catch (e) {
+                  return callback(e, null);
+                }
+                return callback(null, _xmlResult);
+              }
+            );
           }
-          catch (e) {
-            return callback(e, null);
-          }
-          return callback(null, _xmlResult);
-        });
-      });
-    });
-
+        );
+      }
+    );
   },
 
   /**
@@ -123,18 +175,32 @@ var builder = {
    *                                                  the property canInjectXML = true
    * @return {String}. Example 'toFixed(int(d.number), 2)'
    */
-  getFormatterString: function (getSafeValue, varName, contextName, formatters, existingFormatters, onlyFormatterWhichInjectXML) {
+  getFormatterString: function (
+    getSafeValue,
+    varName,
+    contextName,
+    formatters,
+    existingFormatters,
+    onlyFormatterWhichInjectXML
+  ) {
     var _lineOfCodes = [];
 
     function getInjectedVariable(variable) {
       var _injectedArgument = getSafeValue(variable);
-      if (variable.startsWith('.') === true) {
+      if (variable.startsWith(".") === true) {
         var _nbPoint = 0;
-        for (; variable[_nbPoint] === '.'; _nbPoint++) {
+        for (; variable[_nbPoint] === "."; _nbPoint++) {
           // count number of point nothing
         }
         var _dynamicVariable = variable.slice(_nbPoint);
-        _injectedArgument = 'helper.getValueOfPath( ' + contextName + '.parentsData[' + (_nbPoint - 1) + '], ' + getSafeValue(_dynamicVariable) + ')';
+        _injectedArgument =
+          "helper.getValueOfPath( " +
+          contextName +
+          ".parentsData[" +
+          (_nbPoint - 1) +
+          "], " +
+          getSafeValue(_dynamicVariable) +
+          ")";
       }
       return _injectedArgument;
     }
@@ -143,46 +209,82 @@ var builder = {
       var _formatter = formatters[i];
       // Percent-Encode the commas when the paramater is string with single quotes: ',' to '%2c'
       _formatter = _formatter.replace(/[']{1}[^']*[']{1}/g, function (matched) {
-        return matched.replace(/,/g, '%2c');
+        return matched.replace(/,/g, "%2c");
       });
-      var _indexFirstParenthesis = _formatter.indexOf('(');
-      var _argumentStr = '';
-      var _functionStr = '';
+      var _indexFirstParenthesis = _formatter.indexOf("(");
+      var _argumentStr = "";
+      var _functionStr = "";
       // this function contains arguments
       if (_indexFirstParenthesis !== -1) {
         _functionStr = _formatter.slice(0, _indexFirstParenthesis);
-        var _indexLastParenthesis = _formatter.lastIndexOf(')'); // TODO error if last Parenthesis is not found
-        var _arguments = _formatter.slice(_indexFirstParenthesis + 1, _indexLastParenthesis).split(/ *, */);
+        var _indexLastParenthesis = _formatter.lastIndexOf(")"); // TODO error if last Parenthesis is not found
+        var _arguments = _formatter
+          .slice(_indexFirstParenthesis + 1, _indexLastParenthesis)
+          .split(/ *, */);
         for (var j = 0; j < _arguments.length; j++) {
-          if (_arguments[j] !== '') {
+          if (_arguments[j] !== "") {
             // remove existing quotes (everything is converted to a string for the momemt. It should change in the future)
             // Percent-Decode the commas to obtain the initial string argument: '%2c' to ','
-            var _argument = _arguments[j].replace(/^ *'?/, '').replace(/'? *$/, '').replace(/%2c/g, ',');
-            if (existingFormatters?.[_functionStr]?.isAcceptingMathExpression === true) {
-              _argumentStr += ', ' + parser.parseMathematicalExpression(_argument, getInjectedVariable)
-            }
-            else {
-              _argumentStr += ', ' + getInjectedVariable(_argument);
+            var _argument = _arguments[j]
+              .replace(/^ *'?/, "")
+              .replace(/'? *$/, "")
+              .replace(/%2c/g, ",");
+            if (
+              existingFormatters?.[_functionStr]?.isAcceptingMathExpression ===
+              true
+            ) {
+              _argumentStr +=
+                ", " +
+                parser.parseMathematicalExpression(
+                  _argument,
+                  getInjectedVariable
+                );
+            } else {
+              _argumentStr += ", " + getInjectedVariable(_argument);
             }
           }
         }
-      }
-      else {
+      } else {
         _functionStr = _formatter;
       }
       if (existingFormatters[_functionStr] === undefined) {
-        var _alternativeFnName = helper.findClosest(_functionStr, existingFormatters);
-        throw Error('Formatter "' + _functionStr + '" does not exist. Do you mean "' + _alternativeFnName + '"?');
+        var _alternativeFnName = helper.findClosest(
+          _functionStr,
+          existingFormatters
+        );
+        throw Error(
+          'Formatter "' +
+            _functionStr +
+            '" does not exist. Do you mean "' +
+            _alternativeFnName +
+            '"?'
+        );
       }
-      if ((existingFormatters[_functionStr].canInjectXML === true && onlyFormatterWhichInjectXML === true)
-        || (existingFormatters[_functionStr].canInjectXML !== true && onlyFormatterWhichInjectXML !== true)) {
-        _lineOfCodes.push(varName + ' = formatters.' + _functionStr + '.call(' + contextName + ', ' + varName + _argumentStr + ');\n');
+      if (
+        (existingFormatters[_functionStr].canInjectXML === true &&
+          onlyFormatterWhichInjectXML === true) ||
+        (existingFormatters[_functionStr].canInjectXML !== true &&
+          onlyFormatterWhichInjectXML !== true)
+      ) {
+        _lineOfCodes.push(
+          varName +
+            " = formatters." +
+            _functionStr +
+            ".call(" +
+            contextName +
+            ", " +
+            varName +
+            _argumentStr +
+            ");\n"
+        );
       }
     }
-    var _str = _lineOfCodes.join('if(' + contextName + '.stopPropagation === false){\n');
+    var _str = _lineOfCodes.join(
+      "if(" + contextName + ".stopPropagation === false){\n"
+    );
     var _nbClosingBraces = _lineOfCodes.length - 1;
     while (_nbClosingBraces-- > 0) {
-      _str += '}';
+      _str += "}";
     }
     return _str;
   },
@@ -199,16 +301,28 @@ var builder = {
    * @param {string} forceObjectTested (optional) : use forceObjectTested instead of _condition.left.parent
    * @return {string}. Example : 'if(d.number['sort'] > 10) { row = true }'
    */
-  getFilterString: function (getSafeVar, getSafeValue, conditions, codeIfTrue, prefix, inverseCondition, forceObjectTested) {
-    prefix = prefix || '';
-    if (!codeIfTrue || !(conditions instanceof Array) || conditions.length === 0) {
-      return '';
+  getFilterString: function (
+    getSafeVar,
+    getSafeValue,
+    conditions,
+    codeIfTrue,
+    prefix,
+    inverseCondition,
+    forceObjectTested
+  ) {
+    prefix = prefix || "";
+    if (
+      !codeIfTrue ||
+      !(conditions instanceof Array) ||
+      conditions.length === 0
+    ) {
+      return "";
     }
-    var _str = '';
+    var _str = "";
     var _alreadyDeclaredFilter = {};
-    var _declareStr = '';
-    _str += 'if(';
-    _str += (inverseCondition === true) ? '!(' : '(';
+    var _declareStr = "";
+    _str += "if(";
+    _str += inverseCondition === true ? "!(" : "(";
     for (var c = 0; c < conditions.length; c++) {
       var _condition = conditions[c];
       var _attr = _condition.left.attr;
@@ -217,43 +331,55 @@ var builder = {
         _objName = forceObjectTested;
       }
       // if the left part is an object
-      var _objectSeparatorIndex = _attr.indexOf('.');
+      var _objectSeparatorIndex = _attr.indexOf(".");
       if (_objectSeparatorIndex !== -1) {
         var _obj = _attr.slice(0, _objectSeparatorIndex);
         _attr = _attr.slice(_objectSeparatorIndex + 1);
-        var _subObjName = '_' + prefix + _obj + '_filter';
+        var _subObjName = "_" + prefix + _obj + "_filter";
         if (_alreadyDeclaredFilter[_subObjName] === undefined) {
-          _declareStr += 'var ' + getSafeVar(_subObjName) + '=' + getSafeVar(_objName) + '[' + getSafeValue(_obj) + '];\n';
+          _declareStr +=
+            "var " +
+            getSafeVar(_subObjName) +
+            "=" +
+            getSafeVar(_objName) +
+            "[" +
+            getSafeValue(_obj) +
+            "];\n";
         }
         _objName = _subObjName;
       }
-      if (_attr === 'i') {
+      if (_attr === "i") {
         var _rightOperator = parseInt(_condition.right, 10);
         var _arrayName = _condition.left.parent;
         if (parseInt(_condition.right, 10) < 0) {
-          _rightOperator = getSafeVar(_arrayName) + '_array_length ' + parseInt(_condition.right, 10);
+          _rightOperator =
+            getSafeVar(_arrayName) +
+            "_array_length " +
+            parseInt(_condition.right, 10);
         }
-        _str += getSafeVar(_arrayName) + '_i ' + _condition.operator + _rightOperator;
-      }
-      else {
+        _str +=
+          getSafeVar(_arrayName) + "_i " + _condition.operator + _rightOperator;
+      } else {
         if (_alreadyDeclaredFilter[_objName] === undefined) {
-          _str += getSafeVar(_objName) + ' && ';
+          _str += getSafeVar(_objName) + " && ";
         }
-        _str += getSafeVar(_objName) + '[' + getSafeValue(_attr) + ']';
-        if (_condition.right === 'true' || _condition.right === 'false') {
+        _str += getSafeVar(_objName) + "[" + getSafeValue(_attr) + "]";
+        if (_condition.right === "true" || _condition.right === "false") {
           // for boolean, convert data to string to accept both cases ('true' == true) and (true == true) for backward compatibility with Carbone v1 & v2
           _str += "+''";
         }
-        _str += _condition.operator + getSafeValue(helper.removeQuote(_condition.right));
+        _str +=
+          _condition.operator +
+          getSafeValue(helper.removeQuote(_condition.right));
       }
       if (c < conditions.length - 1) {
-        _str += ' && ';
+        _str += " && ";
       }
       _alreadyDeclaredFilter[_objName] = true;
     }
-    _str += ')){\n ';
-    _str += codeIfTrue + ';\n';
-    _str += ' }';
+    _str += ")){\n ";
+    _str += codeIfTrue + ";\n";
+    _str += " }";
 
     return _declareStr + _str;
   },
@@ -267,7 +393,7 @@ var builder = {
    * @return {string} final result
    */
   assembleXmlParts: function (arrayOfStringPart, sortDepth, builderDictionary) {
-    var _res = '';
+    var _res = "";
     builder.sortXmlParts(arrayOfStringPart);
     var _rowInfo = [];
     var _prevDepth = 0;
@@ -278,24 +404,26 @@ var builder = {
     var _prevHideBlock = 0;
 
     // TODO MANAGE  sortDepth
-    sortDepth = (sortDepth) ? sortDepth : 1;
+    sortDepth = sortDepth ? sortDepth : 1;
     // init _rowInfo
     for (var loop = 0; loop <= sortDepth; loop++) {
       _rowInfo.push({
         xmlPos: 0,
-        rowShow: 0
+        rowShow: 0,
       });
     }
     for (var i = 0; i < arrayOfStringPart.length; i++) {
       var _part = arrayOfStringPart[i];
-      var _str = '';
+      var _str = "";
       // Get count value if needed
       builder.getLoopIteration(_loopIds, _part);
       // keep parts if positions are not the same as the last one OR if the it the beginning of an array
-      if ((_prevPart.rowStart === true && _part.rowStart !== true) || isArrayEqual(_prevPart.pos, _part.pos) === false) {
+      if (
+        (_prevPart.rowStart === true && _part.rowStart !== true) ||
+        isArrayEqual(_prevPart.pos, _part.pos) === false
+      ) {
         _prevPart = _part;
-      }
-      else {
+      } else {
         continue;
       }
       _prevHideBlock = _hideBlock;
@@ -310,20 +438,19 @@ var builder = {
       }
       // include "before" XML string all the time, except at the end of if block
       if (!(_hideBlock === 0 && _prevHideBlock > 0)) {
-        _str = _part.bef !== undefined ? builderDictionary[_part.bef] : '';
+        _str = _part.bef !== undefined ? builderDictionary[_part.bef] : "";
       }
       // include "after" XML string and the value to inject (_part.str) all the time, except at the beginning of if block
       if (!(_hideBlock > 0 && _prevHideBlock === 0)) {
         _str += _part.str;
-        _str += _part.aft !== undefined ? builderDictionary[_part.aft] : '';
+        _str += _part.aft !== undefined ? builderDictionary[_part.aft] : "";
       }
       _res += _str;
 
       var _depth = _part.pos.length;
       if (_prevDepth < _depth) {
         _arrayLevel++;
-      }
-      else if (_prevDepth > _depth) {
+      } else if (_prevDepth > _depth) {
         _arrayLevel--;
       }
       _prevDepth = _depth;
@@ -332,14 +459,13 @@ var builder = {
       if (_rowInfo[_arrayLevel] === undefined) {
         _rowInfo[_arrayLevel] = {
           xmlPos: 0,
-          rowShow: 0
+          rowShow: 0,
         };
       }
       _rowInfo[_arrayLevel].rowShow |= _part.rowShow;
       if (_part.rowStart === true) {
         _rowInfo[_arrayLevel].xmlPos = _res.length - _str.length;
-      }
-      else if (_part.rowEnd === true) {
+      } else if (_part.rowEnd === true) {
         if (_rowInfo[_arrayLevel].rowShow === 0) {
           _res = _res.slice(0, _rowInfo[_arrayLevel].xmlPos);
         }
@@ -384,7 +510,6 @@ var builder = {
    * @param {array} arrayToSort : array of objects
    */
   sortXmlParts: function (arrayToSort) {
-
     function compare(a, b) {
       var i = 0;
       var _a = a.pos[i];
@@ -397,10 +522,10 @@ var builder = {
         _b = b.pos[i];
       }
       if (_a !== undefined && _b !== undefined) {
-        return (_a > _b) ? 1 : -1;
+        return _a > _b ? 1 : -1;
       }
       if (_a === undefined && _b === undefined && a.rowShow !== b.rowShow) {
-        return (a.rowShow === false && b.rowShow === true) ? 1 : -1;
+        return a.rowShow === false && b.rowShow === true ? 1 : -1;
       }
       return _aLength - _bLength;
     }
@@ -417,32 +542,55 @@ var builder = {
    * @param {string} nextAttrName : next attribute name of the descriptor we will visit
    * @param {function} execute(exitedArrayName) : called for each array we are leaving.
    */
-  forEachArrayExit: function (currentlyVisitedArrays, objDependencyDescriptor, nextAttrName, execute) {
-    var _currentParentAttr = '';
+  forEachArrayExit: function (
+    currentlyVisitedArrays,
+    objDependencyDescriptor,
+    nextAttrName,
+    execute
+  ) {
+    var _currentParentAttr = "";
     if (objDependencyDescriptor[nextAttrName] !== undefined) {
       _currentParentAttr = objDependencyDescriptor[nextAttrName].parent;
     }
     if (currentlyVisitedArrays.length > 0) {
       var _firstParentOfTypeArray = _currentParentAttr;
       // go up in the tree until we meet an array
-      while (_firstParentOfTypeArray !== '' && objDependencyDescriptor[_firstParentOfTypeArray].type !== 'array') {
-        _firstParentOfTypeArray = objDependencyDescriptor[_firstParentOfTypeArray].parent;
+      while (
+        _firstParentOfTypeArray !== "" &&
+        objDependencyDescriptor[_firstParentOfTypeArray].type !== "array"
+      ) {
+        _firstParentOfTypeArray =
+          objDependencyDescriptor[_firstParentOfTypeArray].parent;
       }
-      var _lastArrayName = currentlyVisitedArrays[currentlyVisitedArrays.length - 1];
+      var _lastArrayName =
+        currentlyVisitedArrays[currentlyVisitedArrays.length - 1];
       var _nextArrayXmlDepth = objDependencyDescriptor[nextAttrName].depth;
       if (_nextArrayXmlDepth === undefined) {
         _nextArrayXmlDepth = -1;
-        if (objDependencyDescriptor[_firstParentOfTypeArray] !== undefined && objDependencyDescriptor[_firstParentOfTypeArray].depth !== undefined) {
-          _nextArrayXmlDepth = objDependencyDescriptor[_firstParentOfTypeArray].depth;
+        if (
+          objDependencyDescriptor[_firstParentOfTypeArray] !== undefined &&
+          objDependencyDescriptor[_firstParentOfTypeArray].depth !== undefined
+        ) {
+          _nextArrayXmlDepth =
+            objDependencyDescriptor[_firstParentOfTypeArray].depth;
         }
       }
-      var _lastArrayXmlDepth = objDependencyDescriptor[_lastArrayName].depth || Number.MAX_SAFE_INTEGER;
-      while (_firstParentOfTypeArray !== _lastArrayName && currentlyVisitedArrays.length > 0 && _nextArrayXmlDepth <= _lastArrayXmlDepth) {
+      var _lastArrayXmlDepth =
+        objDependencyDescriptor[_lastArrayName].depth ||
+        Number.MAX_SAFE_INTEGER;
+      while (
+        _firstParentOfTypeArray !== _lastArrayName &&
+        currentlyVisitedArrays.length > 0 &&
+        _nextArrayXmlDepth <= _lastArrayXmlDepth
+      ) {
         execute(_lastArrayName);
         currentlyVisitedArrays.pop();
         if (currentlyVisitedArrays.length > 0) {
-          _lastArrayName = currentlyVisitedArrays[currentlyVisitedArrays.length - 1];
-          _lastArrayXmlDepth = objDependencyDescriptor[_lastArrayName].depth || Number.MAX_SAFE_INTEGER;
+          _lastArrayName =
+            currentlyVisitedArrays[currentlyVisitedArrays.length - 1];
+          _lastArrayXmlDepth =
+            objDependencyDescriptor[_lastArrayName].depth ||
+            Number.MAX_SAFE_INTEGER;
         }
       }
     }
@@ -460,7 +608,7 @@ var builder = {
       if (_alreadyCreatedVar !== undefined) {
         return _alreadyCreatedVar;
       }
-      let _newVar = '_gV' + _dictionary.size;
+      let _newVar = "_gV" + _dictionary.size;
       _dictionary.set(jsVariable, _newVar);
       return _newVar;
     };
@@ -481,7 +629,7 @@ var builder = {
       if (_dictIndex !== undefined) {
         return _dictIndex;
       }
-      _dictIndex = (_dictionary.push(xmlOrConstantValue) - 1);
+      _dictIndex = _dictionary.push(xmlOrConstantValue) - 1;
       _dictionaryIndex.set(xmlOrConstantValue, _dictIndex);
       return _dictIndex;
     }
@@ -491,12 +639,12 @@ var builder = {
       // get the JS code to access securely to a dictionary's value in the builder function
       get: function (xmlOrConstantValue) {
         let _dictIndex = getIndex(xmlOrConstantValue);
-        return dictionaryName + '[' + _dictIndex + ']';
+        return dictionaryName + "[" + _dictIndex + "]";
       },
       // get the dictionary
       getDictionary: function () {
         return _dictionary;
-      }
+      },
     };
   },
 
@@ -510,29 +658,35 @@ var builder = {
   getBuilderFunction: function (descriptor, existingFormatters) {
     var that = this;
     var _code = {
-      init: '',
-      prev: '',
-      main: '',
+      init: "",
+      prev: "",
+      main: "",
       add: function () {
         var _lastIndex = arguments.length - 1;
         var _str = arguments[_lastIndex];
         for (var i = 0; i < _lastIndex; i++) {
           this[arguments[i]] += _str;
         }
-      }
+      },
     };
     var _getSafeVar = that.generateSafeJSVariable();
-    var _dictionaryName = '_dictionary';
+    var _dictionaryName = "_dictionary";
     var _safeAccessor = that.generateSafeJSValueAccessor(_dictionaryName);
     var _getSafeValue = _safeAccessor.get;
     var _getXMLStrIndex = _safeAccessor.getIndex;
-    _code.add('prev', addIfNotExist.toString() + '\n' + removeFrom.toString() + '\n');
-    _code.add('init', "var _strResult = '';\n");
-    _code.add('init', 'var ' + _getSafeVar('_root') + '= (data !== null)?data:{};\n');
-    _code.add('init', 'var _strPart = {};\n');
-    _code.add('init', 'var _strParts = [];\n');
-    _code.add('init', 'var _xmlPos = [0];\n');
-    _code.add('init', 'var formatters = context.formatters;\n');
+    _code.add(
+      "prev",
+      addIfNotExist.toString() + "\n" + removeFrom.toString() + "\n"
+    );
+    _code.add("init", "var _strResult = '';\n");
+    _code.add(
+      "init",
+      "var " + _getSafeVar("_root") + "= (data !== null)?data:{};\n"
+    );
+    _code.add("init", "var _strPart = {};\n");
+    _code.add("init", "var _strParts = [];\n");
+    _code.add("init", "var _xmlPos = [0];\n");
+    _code.add("init", "var formatters = context.formatters;\n");
 
     var _atLeastOneSpecialIterator = false;
     var _lastArrayEnd = 0;
@@ -544,28 +698,37 @@ var builder = {
     var _staticData = descriptor.staticData || {};
     var _hierarchy = descriptor.hierarchy || [];
 
-    if (_staticData.before !== '') {
-      _code.add('main', '_strPart = {\n');
-      _code.add('main', "  'pos' : [0],\n");
-      _code.add('main', "  'str' : '',\n");
-      _code.add('main', "  'bef' : " + _getXMLStrIndex(_staticData.before) + '\n');
-      _code.add('main', '};\n');
-      _code.add('main', '_strParts.push(_strPart);\n');
+    if (_staticData.before !== "") {
+      _code.add("main", "_strPart = {\n");
+      _code.add("main", "  'pos' : [0],\n");
+      _code.add("main", "  'str' : '',\n");
+      _code.add(
+        "main",
+        "  'bef' : " + _getXMLStrIndex(_staticData.before) + "\n"
+      );
+      _code.add("main", "};\n");
+      _code.add("main", "_strParts.push(_strPart);\n");
     }
 
     var _noIteratorTemplate = true;
     for (var exitedArrayName in _dynamicData) {
-      if (_dynamicData[exitedArrayName].iterators !== undefined && _dynamicData[exitedArrayName].iterators.length > 0) {
+      if (
+        _dynamicData[exitedArrayName].iterators !== undefined &&
+        _dynamicData[exitedArrayName].iterators.length > 0
+      ) {
         _noIteratorTemplate = false;
       }
     }
     if (_noIteratorTemplate) {
-      _code.add('main', 'var _registeredXml = {};\n');
+      _code.add("main", "var _registeredXml = {};\n");
     }
 
     for (var _objNameDeclaration in _dynamicData) {
-      if (_objNameDeclaration !== '_root') {
-        _code.add('init', 'var ' + _getSafeVar(_objNameDeclaration) + ' = {};\n');
+      if (_objNameDeclaration !== "_root") {
+        _code.add(
+          "init",
+          "var " + _getSafeVar(_objNameDeclaration) + " = {};\n"
+        );
       }
     }
 
@@ -579,86 +742,247 @@ var builder = {
       var _arrayDepth = _dynamicData[_objName].depth || 0;
       var _beforeStr = _dynamicData[_objName].before;
 
-      that.forEachArrayExit(_nestedArray, _dynamicData, _objName, function (exitedArrayName) {
-        _code.add('prev', 'main', '}\n');
-        if (_dynamicData[exitedArrayName].iterators !== undefined) {
-          _nbCustomIterator -= _dynamicData[exitedArrayName].iterators.length - 1;
+      that.forEachArrayExit(
+        _nestedArray,
+        _dynamicData,
+        _objName,
+        function (exitedArrayName) {
+          _code.add("prev", "main", "}\n");
+          if (_dynamicData[exitedArrayName].iterators !== undefined) {
+            _nbCustomIterator -=
+              _dynamicData[exitedArrayName].iterators.length - 1;
+          }
         }
-      });
+      );
 
-      if (_type === 'object') {
-        if (_objName !== '_root') {
-          _code.add('prev', 'main', _getSafeVar(_objName) + '=' + '(' + _getSafeVar(_objParentName) + ' instanceof Object)?' + _getSafeVar(_objParentName) + '[' + _realObjName + ']:{};\n');
+      if (_type === "object") {
+        if (_objName !== "_root") {
+          _code.add(
+            "prev",
+            "main",
+            _getSafeVar(_objName) +
+              "=" +
+              "(" +
+              _getSafeVar(_objParentName) +
+              " instanceof Object)?" +
+              _getSafeVar(_objParentName) +
+              "[" +
+              _realObjName +
+              "]:{};\n"
+          );
         }
-      }
-      else if (_type === 'objectInArray') {
-        var _arrayOfObjectNameG = _getSafeVar(_objName) + '_array';
-        var _arrayOfObjectIndexNameG = _getSafeVar(_objName) + '_i';
-        _code.add('prev', 'main', 'var ' + _arrayOfObjectNameG + '=' + '(' + _getSafeVar(_objParentName) + ' instanceof Object)? ' + _getSafeVar(_objParentName) + '[' + _realObjName + ']:[];\n');
+      } else if (_type === "objectInArray") {
+        var _arrayOfObjectNameG = _getSafeVar(_objName) + "_array";
+        var _arrayOfObjectIndexNameG = _getSafeVar(_objName) + "_i";
+        _code.add(
+          "prev",
+          "main",
+          "var " +
+            _arrayOfObjectNameG +
+            "=" +
+            "(" +
+            _getSafeVar(_objParentName) +
+            " instanceof Object)? " +
+            _getSafeVar(_objParentName) +
+            "[" +
+            _realObjName +
+            "]:[];\n"
+        );
         var _conditionToFindObject = _dynamicData[_objName].conditions || [];
-        var _objNameTemp = _objName + '_temp';
+        var _objNameTemp = _objName + "_temp";
 
-        _code.add('prev', 'main', _getSafeVar(_objName) + '={};\n');
-        _code.add('prev', 'main', 'var ' + _arrayOfObjectNameG + '_length = (' + _arrayOfObjectNameG + ' instanceof Array)?' + _arrayOfObjectNameG + '.length : 0;\n');
-        _code.add('prev', 'main', 'for (var ' + _arrayOfObjectIndexNameG + ' = 0; ' + _arrayOfObjectIndexNameG + ' < ' + _arrayOfObjectNameG + '_length ; ' + _arrayOfObjectIndexNameG + '++) {\n');
-        _code.add('prev', 'main', '  var ' + _getSafeVar(_objNameTemp) + ' = ' + _arrayOfObjectNameG + '[' + _arrayOfObjectIndexNameG + '];\n');
-        _code.add('prev', 'main', that.getFilterString(_getSafeVar, _getSafeValue, _conditionToFindObject, _getSafeVar(_objName) + '=' + _arrayOfObjectNameG + '[' + _arrayOfObjectIndexNameG + '];\n break;\n', _objNameTemp, false, _objNameTemp));
-        _code.add('prev', 'main', '}\n');
-      }
-      else if (_type === 'array') {
+        _code.add("prev", "main", _getSafeVar(_objName) + "={};\n");
+        _code.add(
+          "prev",
+          "main",
+          "var " +
+            _arrayOfObjectNameG +
+            "_length = (" +
+            _arrayOfObjectNameG +
+            " instanceof Array)?" +
+            _arrayOfObjectNameG +
+            ".length : 0;\n"
+        );
+        _code.add(
+          "prev",
+          "main",
+          "for (var " +
+            _arrayOfObjectIndexNameG +
+            " = 0; " +
+            _arrayOfObjectIndexNameG +
+            " < " +
+            _arrayOfObjectNameG +
+            "_length ; " +
+            _arrayOfObjectIndexNameG +
+            "++) {\n"
+        );
+        _code.add(
+          "prev",
+          "main",
+          "  var " +
+            _getSafeVar(_objNameTemp) +
+            " = " +
+            _arrayOfObjectNameG +
+            "[" +
+            _arrayOfObjectIndexNameG +
+            "];\n"
+        );
+        _code.add(
+          "prev",
+          "main",
+          that.getFilterString(
+            _getSafeVar,
+            _getSafeValue,
+            _conditionToFindObject,
+            _getSafeVar(_objName) +
+              "=" +
+              _arrayOfObjectNameG +
+              "[" +
+              _arrayOfObjectIndexNameG +
+              "];\n break;\n",
+            _objNameTemp,
+            false,
+            _objNameTemp
+          )
+        );
+        _code.add("prev", "main", "}\n");
+      } else if (_type === "array") {
         var _posStart = _dynamicData[_objName].position.start;
         var _posEnd = _dynamicData[_objName].position.end;
-        var _arrayIndexNameG = _getSafeVar(_objName) + '_i';
-        var _arrayNameG = _getSafeVar(_objName) + '_array';
+        var _arrayIndexNameG = _getSafeVar(_objName) + "_i";
+        var _arrayNameG = _getSafeVar(_objName) + "_array";
         var _iterators = _dynamicData[_objName].iterators;
         var _repeater = _dynamicData[_objName].repeater;
-        var _repeaterGlobalCounter = _getSafeVar(_objName) + '_repeatCount';
-        var _containSpecialIterator = _dynamicData[_objName].containSpecialIterator;
+        var _repeaterGlobalCounter = _getSafeVar(_objName) + "_repeatCount";
+        var _containSpecialIterator =
+          _dynamicData[_objName].containSpecialIterator;
 
-        _code.add('main', '_xmlPos[' + (_nbCustomIterator + _arrayDepth * 2 - 2) + '] = ' + _posStart + ';\n');
-        _code.add('main', '_xmlPos[' + (_nbCustomIterator + _arrayDepth * 2 - 1) + '] = ' + _posStart + ';\n');
+        _code.add(
+          "main",
+          "_xmlPos[" +
+            (_nbCustomIterator + _arrayDepth * 2 - 2) +
+            "] = " +
+            _posStart +
+            ";\n"
+        );
+        _code.add(
+          "main",
+          "_xmlPos[" +
+            (_nbCustomIterator + _arrayDepth * 2 - 1) +
+            "] = " +
+            _posStart +
+            ";\n"
+        );
 
-        if (_objName !== '_root') {
-          _code.add('prev', 'main', 'var ' + _arrayNameG + '=' + '(' + _getSafeVar(_objParentName) + ' instanceof Object) ?' + _getSafeVar(_objParentName) + '[' + _realObjName + ']:[];\n');
+        if (_objName !== "_root") {
+          _code.add(
+            "prev",
+            "main",
+            "var " +
+              _arrayNameG +
+              "=" +
+              "(" +
+              _getSafeVar(_objParentName) +
+              " instanceof Object) ?" +
+              _getSafeVar(_objParentName) +
+              "[" +
+              _realObjName +
+              "]:[];\n"
+          );
+        } else {
+          _code.add(
+            "prev",
+            "main",
+            "var " + _arrayNameG + "=" + _getSafeVar(_objName) + ";\n"
+          );
         }
-        else {
-          _code.add('prev', 'main', 'var ' + _arrayNameG + '=' + _getSafeVar(_objName) + ';\n');
-        }
-        _lastArrayEnd = (_posEnd > _lastArrayEnd) ? _posEnd : _lastArrayEnd;
+        _lastArrayEnd = _posEnd > _lastArrayEnd ? _posEnd : _lastArrayEnd;
 
-        if (_beforeStr !== undefined && _beforeStr !== '') {
-          _code.add('main', '_strPart = {\n');
-          _code.add('main', "  'pos' :  _xmlPos.slice(0, " + (_nbCustomIterator + _arrayDepth * 2 - 1) + '),\n');
-          _code.add('main', "  'str' : '',\n");
-          _code.add('main', "  'bef' : " + _getXMLStrIndex(_beforeStr) + '\n');
-          _code.add('main', '};\n');
-          _code.add('main', '_strParts.push(_strPart);\n');
+        if (_beforeStr !== undefined && _beforeStr !== "") {
+          _code.add("main", "_strPart = {\n");
+          _code.add(
+            "main",
+            "  'pos' :  _xmlPos.slice(0, " +
+              (_nbCustomIterator + _arrayDepth * 2 - 1) +
+              "),\n"
+          );
+          _code.add("main", "  'str' : '',\n");
+          _code.add("main", "  'bef' : " + _getXMLStrIndex(_beforeStr) + "\n");
+          _code.add("main", "};\n");
+          _code.add("main", "_strParts.push(_strPart);\n");
         }
         _nestedArray.push(_objName);
-        var _missingIteratorArrayNameG = _arrayNameG + '_missingIterators';
+        var _missingIteratorArrayNameG = _arrayNameG + "_missingIterators";
         if (_containSpecialIterator === true) {
-          _missingIteratorArrayNameG = _arrayNameG + '_missingIterators';
-          _code.add('main', 'var ' + _missingIteratorArrayNameG + '=[];\n');
+          _missingIteratorArrayNameG = _arrayNameG + "_missingIterators";
+          _code.add("main", "var " + _missingIteratorArrayNameG + "=[];\n");
         }
 
-        _code.add('prev', 'main', 'var ' + _arrayNameG + '_length = 0;\n');
-        _code.add('prev', 'main', 'if (' + _arrayNameG + ' instanceof Array) {\n');
-        _code.add('prev', 'main', _arrayNameG + '_length = ' + _arrayNameG + '.length;\n');
-        _code.add('prev', 'main', '} else if (' + _arrayNameG + ' instanceof Object) {\n');
-        _code.add('prev', 'main', _arrayNameG + ' = Object.entries(' + _arrayNameG + ').map((a) => { return {att : a[0], val : a[1] } });\n');
-        _code.add('prev', 'main', _arrayNameG + '_length = ' + _arrayNameG + '.length;\n');
-        _code.add('prev', 'main', '}\n');
+        _code.add("prev", "main", "var " + _arrayNameG + "_length = 0;\n");
+        _code.add(
+          "prev",
+          "main",
+          "if (" + _arrayNameG + " instanceof Array) {\n"
+        );
+        _code.add(
+          "prev",
+          "main",
+          _arrayNameG + "_length = " + _arrayNameG + ".length;\n"
+        );
+        _code.add(
+          "prev",
+          "main",
+          "} else if (" + _arrayNameG + " instanceof Object) {\n"
+        );
+        _code.add(
+          "prev",
+          "main",
+          _arrayNameG +
+            " = Object.entries(" +
+            _arrayNameG +
+            ").map((a) => { return {att : a[0], val : a[1] } });\n"
+        );
+        _code.add(
+          "prev",
+          "main",
+          _arrayNameG + "_length = " + _arrayNameG + ".length;\n"
+        );
+        _code.add("prev", "main", "}\n");
 
         if (_repeater) {
-          _code.add('prev', 'main', 'var ' + _repeaterGlobalCounter + ' = 0;\n');
+          _code.add(
+            "prev",
+            "main",
+            "var " + _repeaterGlobalCounter + " = 0;\n"
+          );
           _nestedArray.push(_objName);
         }
-        _code.add('prev', 'main', 'for (var ' + _arrayIndexNameG + ' = 0; ' + _arrayIndexNameG + ' < ' + _arrayNameG + '_length ');
+        _code.add(
+          "prev",
+          "main",
+          "for (var " +
+            _arrayIndexNameG +
+            " = 0; " +
+            _arrayIndexNameG +
+            " < " +
+            _arrayNameG +
+            "_length "
+        );
         if (_containSpecialIterator === true) {
-          _code.add('main', '  || ' + _missingIteratorArrayNameG + '.length>0');
+          _code.add("main", "  || " + _missingIteratorArrayNameG + ".length>0");
         }
-        _code.add('prev', 'main', '  ; ' + _arrayIndexNameG + '++) {\n');
-        _code.add('prev', 'main', '  var ' + _getSafeVar(_objName) + ' = ' + _arrayNameG + '[' + _arrayIndexNameG + '];\n');
+        _code.add("prev", "main", "  ; " + _arrayIndexNameG + "++) {\n");
+        _code.add(
+          "prev",
+          "main",
+          "  var " +
+            _getSafeVar(_objName) +
+            " = " +
+            _arrayNameG +
+            "[" +
+            _arrayIndexNameG +
+            "];\n"
+        );
 
         for (var it = 0; it < _iterators.length; it++) {
           var _iterator = _iterators[it];
@@ -667,46 +991,145 @@ var builder = {
           if (it > 0) {
             _nbCustomIterator++;
           }
-          if (_iterator.attr === 'i') {
-            _code.add('main', '  _xmlPos[' + (_nbCustomIterator + _arrayDepth * 2 - 1) + '] = ' + _arrayIndexNameG + ';\n');
+          if (_iterator.attr === "i") {
+            _code.add(
+              "main",
+              "  _xmlPos[" +
+                (_nbCustomIterator + _arrayDepth * 2 - 1) +
+                "] = " +
+                _arrayIndexNameG +
+                ";\n"
+            );
             if (_repeater) {
               var _repeaterAttr = _getSafeValue(_repeater);
-              var _repeaterName = _getSafeVar(_objName) + '_repeat';
-              _code.add('prev', 'main', ' let ' + _repeaterName + ' = ' + _getSafeVar(_objName) + '[' + _repeaterAttr + '];\n');
-              _code.add('prev', 'main', ' if ( ' + _repeaterName + ' > 200 ) { throw Error("The repeater cannot be above 200"); }\n');
-              _code.add('main', 'while( ' + _repeaterName + '-- > 0) {\n');
-              _code.add('main', '  _xmlPos[' + (_nbCustomIterator + _arrayDepth * 2 - 1) + '] = ' + _repeaterGlobalCounter + '++;\n');
+              var _repeaterName = _getSafeVar(_objName) + "_repeat";
+              _code.add(
+                "prev",
+                "main",
+                " let " +
+                  _repeaterName +
+                  " = " +
+                  _getSafeVar(_objName) +
+                  "[" +
+                  _repeaterAttr +
+                  "];\n"
+              );
+              _code.add(
+                "prev",
+                "main",
+                " if ( " +
+                  _repeaterName +
+                  ' > 200 ) { throw Error("The repeater cannot be above 200"); }\n'
+              );
+              _code.add("main", "while( " + _repeaterName + "-- > 0) {\n");
+              _code.add(
+                "main",
+                "  _xmlPos[" +
+                  (_nbCustomIterator + _arrayDepth * 2 - 1) +
+                  "] = " +
+                  _repeaterGlobalCounter +
+                  "++;\n"
+              );
             }
-          }
-          else {
-            var _iteratorNameG = _getSafeVar(_objName) + '_it';
-            var _iteratorObjNameG = _getSafeVar(_objName) + '_itObj';
-            _code.add('prev', 'main', ' var ' + _iteratorNameG + ' = 0;\n');
+          } else {
+            var _iteratorNameG = _getSafeVar(_objName) + "_it";
+            var _iteratorObjNameG = _getSafeVar(_objName) + "_itObj";
+            _code.add("prev", "main", " var " + _iteratorNameG + " = 0;\n");
             if (_containSpecialIterator === true) {
-              _code.add('main', 'if(' + _getSafeVar(_objName) + ' !== undefined){\n');
+              _code.add(
+                "main",
+                "if(" + _getSafeVar(_objName) + " !== undefined){\n"
+              );
             }
             if (_iterator.obj !== undefined) {
-              _code.add('prev', 'main', ' var ' + _iteratorObjNameG + ' = ' + _getSafeVar(_objName) + '[' + _iteratorObjG + '];\n');
-              _code.add('prev', 'main', ' if(' + _iteratorObjNameG + ' !== undefined) {\n');
-              _code.add('prev', 'main', '   ' + _iteratorNameG + ' = ' + _iteratorObjNameG + '[' + _iteratorAttrG + '];\n');
-              _code.add('prev', 'main', ' }\n');
-            }
-            else {
-              _code.add('prev', 'main', ' ' + _iteratorNameG + ' = ' + _getSafeVar(_objName) + '[' + _iteratorAttrG + '];\n');
+              _code.add(
+                "prev",
+                "main",
+                " var " +
+                  _iteratorObjNameG +
+                  " = " +
+                  _getSafeVar(_objName) +
+                  "[" +
+                  _iteratorObjG +
+                  "];\n"
+              );
+              _code.add(
+                "prev",
+                "main",
+                " if(" + _iteratorObjNameG + " !== undefined) {\n"
+              );
+              _code.add(
+                "prev",
+                "main",
+                "   " +
+                  _iteratorNameG +
+                  " = " +
+                  _iteratorObjNameG +
+                  "[" +
+                  _iteratorAttrG +
+                  "];\n"
+              );
+              _code.add("prev", "main", " }\n");
+            } else {
+              _code.add(
+                "prev",
+                "main",
+                " " +
+                  _iteratorNameG +
+                  " = " +
+                  _getSafeVar(_objName) +
+                  "[" +
+                  _iteratorAttrG +
+                  "];\n"
+              );
             }
             if (_containSpecialIterator === true) {
-              _code.add('main', '  removeFrom(' + _missingIteratorArrayNameG + ', ' + _iteratorNameG + ');\n');
-              _code.add('main', '}else{\n');
-              _code.add('main', '  ' + _iteratorNameG + ' = ' + _missingIteratorArrayNameG + '.pop();\n');
-              _code.add('main', '}\n');
+              _code.add(
+                "main",
+                "  removeFrom(" +
+                  _missingIteratorArrayNameG +
+                  ", " +
+                  _iteratorNameG +
+                  ");\n"
+              );
+              _code.add("main", "}else{\n");
+              _code.add(
+                "main",
+                "  " +
+                  _iteratorNameG +
+                  " = " +
+                  _missingIteratorArrayNameG +
+                  ".pop();\n"
+              );
+              _code.add("main", "}\n");
             }
-            _code.add('main', '  _xmlPos[' + (_nbCustomIterator + _arrayDepth * 2 - 1) + '] = ' + _iteratorNameG + ';\n');
+            _code.add(
+              "main",
+              "  _xmlPos[" +
+                (_nbCustomIterator + _arrayDepth * 2 - 1) +
+                "] = " +
+                _iteratorNameG +
+                ";\n"
+            );
             if (_iterator.isSpecial === true) {
               _atLeastOneSpecialIterator = true;
-              var _allIteratorArrayNameG = _iteratorNameG + '_wanted';
-              _code.main = _code.main.replace(_missingIteratorArrayNameG + '=[]', _missingIteratorArrayNameG + '=' + _allIteratorArrayNameG + '.slice()');
-              _code.add('init', 'var ' + _allIteratorArrayNameG + '=[];\n');
-              _code.add('prev', ' addIfNotExist(' + _allIteratorArrayNameG + ', ' + _iteratorNameG + ');\n');
+              var _allIteratorArrayNameG = _iteratorNameG + "_wanted";
+              _code.main = _code.main.replace(
+                _missingIteratorArrayNameG + "=[]",
+                _missingIteratorArrayNameG +
+                  "=" +
+                  _allIteratorArrayNameG +
+                  ".slice()"
+              );
+              _code.add("init", "var " + _allIteratorArrayNameG + "=[];\n");
+              _code.add(
+                "prev",
+                " addIfNotExist(" +
+                  _allIteratorArrayNameG +
+                  ", " +
+                  _iteratorNameG +
+                  ");\n"
+              );
             }
           }
         }
@@ -723,74 +1146,153 @@ var builder = {
         if (_xmlPart.pos > _keepHighestPosition) {
           _keepHighestPosition = _xmlPart.pos;
         }
-        _code.add('main', '_xmlPos[' + (_nbCustomIterator + _partDepth * 2) + '] = ' + _xmlPart.pos + ';\n');
-        _code.add('main', '_strPart = {\n');
-        _code.add('main', "  'pos' : _xmlPos.slice(0, " + (_nbCustomIterator + _partDepth * 2 + 1) + '),\n');
-        _code.add('main', "  'str' : ''\n");
-        _code.add('main', '};\n');
+        _code.add(
+          "main",
+          "_xmlPos[" +
+            (_nbCustomIterator + _partDepth * 2) +
+            "] = " +
+            _xmlPart.pos +
+            ";\n"
+        );
+        _code.add("main", "_strPart = {\n");
+        _code.add(
+          "main",
+          "  'pos' : _xmlPos.slice(0, " +
+            (_nbCustomIterator + _partDepth * 2 + 1) +
+            "),\n"
+        );
+        _code.add("main", "  'str' : ''\n");
+        _code.add("main", "};\n");
         if (_xmlPart.before) {
-          _code.add('main', '_strPart.bef = ' + _getXMLStrIndex(_xmlPart.before) + ';\n');
+          _code.add(
+            "main",
+            "_strPart.bef = " + _getXMLStrIndex(_xmlPart.before) + ";\n"
+          );
         }
-        if (_xmlPart.array === 'start') {
-          _code.add('main', '_strPart.rowStart = true;\n');
-        }
-        else if (_xmlPart.array === 'end') {
-          _code.add('main', '_strPart.rowEnd = true;\n');
+        if (_xmlPart.array === "start") {
+          _code.add("main", "_strPart.rowStart = true;\n");
+        } else if (_xmlPart.array === "end") {
+          _code.add("main", "_strPart.rowEnd = true;\n");
         }
 
         if (_dataAttr) {
-          _code.add('main', '_strPart.rowShow = true;\n');
-          _code.add('main', that.getFilterString(_getSafeVar, _getSafeValue, _conditions, '_strPart.rowShow = false', _getSafeVar(_objName), true));
+          _code.add("main", "_strPart.rowShow = true;\n");
+          _code.add(
+            "main",
+            that.getFilterString(
+              _getSafeVar,
+              _getSafeValue,
+              _conditions,
+              "_strPart.rowShow = false",
+              _getSafeVar(_objName),
+              true
+            )
+          );
           // if (_dataAttr === 'image') {
           //   _code.add('main', getImageTag(_getSafeVar(_dataObj) + '[' + _getSafeValue(_dataAttr) + ']'));
           // } else {
-          _code.add('main', 'var _str = ' + _getSafeVar(_dataObj) + ' !== undefined &&  ' + _getSafeVar(_dataObj) + ' !== null ? ' + _getSafeVar(_dataObj) + '[' + _getSafeValue(_dataAttr) + ']' + ' : undefined ;\n');
+          _code.add(
+            "main",
+            "var _str = " +
+              _getSafeVar(_dataObj) +
+              " !== undefined &&  " +
+              _getSafeVar(_dataObj) +
+              " !== null ? " +
+              _getSafeVar(_dataObj) +
+              "[" +
+              _getSafeValue(_dataAttr) +
+              "]" +
+              " : undefined ;\n"
+          );
           //}
-          _code.add('main', 'context.stopPropagation = false;\n');
-          _code.add('main', 'context.isConditionTrue = null;\n');
-          _code.add('main', 'context.isAndOperator = null;\n');
-          _code.add('main', 'context.isHidden = null;\n');
-          _code.add('main', 'context.parentsData = [' + _getSafeVar(_dataObj) + ', ' + _objParentNames.map(_getSafeVar).join(',') + '];\n');
-          _code.add('main', that.getFormatterString(_getSafeValue, '_str', 'context', _formatters, existingFormatters, false));
-          _code.add('main', 'if(_str === null || _str === undefined) {\n');
-          _code.add('main', "  _str = '';\n");
-          _code.add('main', '};\n');
-          _code.add('main', 'if (context.isHidden !== null){\n');
-          _code.add('main', '  _strPart.hide = context.isHidden;\n');
-          _code.add('main', '}\n');
-          _code.add('main', "if(typeof(_str) === 'string') {\n");
-          _code.add('main', "  _str = _str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\\u0000-\\u0008]|[\\u000B-\\u000C]|[\\u000E-\\u001F]/g, '');\n");
-          _code.add('main', '};\n');
-          _code.add('main', that.getFormatterString(_getSafeValue, '_str', 'context', _formatters, existingFormatters, true));
-          _code.add('main', "_strPart.str += (_strPart.rowShow !== false)?_str:''" + ';\n');
+          _code.add("main", "context.stopPropagation = false;\n");
+          _code.add("main", "context.isConditionTrue = null;\n");
+          _code.add("main", "context.isAndOperator = null;\n");
+          _code.add("main", "context.isHidden = null;\n");
+          _code.add(
+            "main",
+            "context.parentsData = [" +
+              _getSafeVar(_dataObj) +
+              ", " +
+              _objParentNames.map(_getSafeVar).join(",") +
+              "];\n"
+          );
+          _code.add(
+            "main",
+            that.getFormatterString(
+              _getSafeValue,
+              "_str",
+              "context",
+              _formatters,
+              existingFormatters,
+              false
+            )
+          );
+          _code.add("main", "if(_str === null || _str === undefined) {\n");
+          _code.add("main", "  _str = '';\n");
+          _code.add("main", "};\n");
+          _code.add("main", "if (context.isHidden !== null){\n");
+          _code.add("main", "  _strPart.hide = context.isHidden;\n");
+          _code.add("main", "}\n");
+          _code.add("main", "if(typeof(_str) === 'string') {\n");
+          _code.add(
+            "main",
+            "  _str = _str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\\u0000-\\u0008]|[\\u000B-\\u000C]|[\\u000E-\\u001F]/g, '');\n"
+          );
+          _code.add("main", "};\n");
+          _code.add(
+            "main",
+            that.getFormatterString(
+              _getSafeValue,
+              "_str",
+              "context",
+              _formatters,
+              existingFormatters,
+              true
+            )
+          );
+          _code.add(
+            "main",
+            "_strPart.str += (_strPart.rowShow !== false)?_str:''" + ";\n"
+          );
         }
         if (_xmlPart.after) {
-          _code.add('main', '_strPart.aft = ' + _getXMLStrIndex(_xmlPart.after) + ';\n');
+          _code.add(
+            "main",
+            "_strPart.aft = " + _getXMLStrIndex(_xmlPart.after) + ";\n"
+          );
         }
         if (_noIteratorTemplate === false) {
-          _code.add('main', '_strParts.push(_strPart);\n');
-        }
-        else {
-          _code.add('main', 'if(_registeredXml[' + _xmlPart.pos + '] !== true || _strPart.rowShow === true ) {\n');
-          _code.add('main', '  _strParts.push(_strPart);\n');
-          _code.add('main', '  _registeredXml[' + _xmlPart.pos + '] = true;\n');
-          _code.add('main', '};\n');
+          _code.add("main", "_strParts.push(_strPart);\n");
+        } else {
+          _code.add(
+            "main",
+            "if(_registeredXml[" +
+              _xmlPart.pos +
+              "] !== true || _strPart.rowShow === true ) {\n"
+          );
+          _code.add("main", "  _strParts.push(_strPart);\n");
+          _code.add("main", "  _registeredXml[" + _xmlPart.pos + "] = true;\n");
+          _code.add("main", "};\n");
         }
       }
     }
     while (_nestedArray.length > 0) {
-      _code.add('prev', 'main', '}\n');
+      _code.add("prev", "main", "}\n");
       _nestedArray.pop();
     }
-    if (_staticData.after !== '') {
-      _code.add('main', '_strPart = {\n');
-      _code.add('main', "  'pos' : [" + (_keepHighestPosition + 1) + '],\n');
-      _code.add('main', "  'str' : '',\n");
-      _code.add('main', "  'aft' : " + _getXMLStrIndex(_staticData.after) + '\n');
-      _code.add('main', '};\n');
-      _code.add('main', '_strParts.push(_strPart);\n');
+    if (_staticData.after !== "") {
+      _code.add("main", "_strPart = {\n");
+      _code.add("main", "  'pos' : [" + (_keepHighestPosition + 1) + "],\n");
+      _code.add("main", "  'str' : '',\n");
+      _code.add(
+        "main",
+        "  'aft' : " + _getXMLStrIndex(_staticData.after) + "\n"
+      );
+      _code.add("main", "};\n");
+      _code.add("main", "_strParts.push(_strPart);\n");
     }
-    _code.add('main', 'return _strParts;');
+    _code.add("main", "return _strParts;");
 
     var _codeAssembled = _code.init;
     if (_atLeastOneSpecialIterator === true) {
@@ -799,16 +1301,22 @@ var builder = {
     _codeAssembled += _code.main;
     var _fn;
     try {
-      _fn = new Function('data', 'context', 'helper', _dictionaryName, _codeAssembled);
+      _fn = new Function(
+        "data",
+        "context",
+        "helper",
+        _dictionaryName,
+        _codeAssembled
+      );
       _fn.builderDictionary = _safeAccessor.getDictionary();
-    }
-    catch (err) {
-      console.log('Execution plan error; ' + err + '\n' + _codeAssembled);
-      throw new Error('Impossible to prepare execution plan. Please, contact the support');
+    } catch (err) {
+      console.log("Execution plan error; " + err + "\n" + _codeAssembled);
+      throw new Error(
+        "Impossible to prepare execution plan. Please, contact the support"
+      );
     }
     return _fn;
-  }
-
+  },
 };
 
 /** ***************************************************************************************************************/
@@ -816,7 +1324,6 @@ var builder = {
 /** ***************************************************************************************************************/
 
 module.exports = builder;
-
 
 /**
  * Test if two arrays are equal
